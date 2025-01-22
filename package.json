@@ -1,0 +1,36 @@
+{
+  "name": "soundfree-web",
+  "version": "1.0.0",
+  "description": "Version web de SoundFree",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "electron:dev": "concurrently \"vite\" \"electron .\""
+  },
+  "dependencies": {
+    "pinia": "^2.3.0",
+    "vue": "^3.4.0",
+    "yt-dlp-wrap": "^2.3.11"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "autoprefixer": "^10.x",
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "postcss": "^8.x",
+    "tailwindcss": "^3.x",
+    "vite": "^5.0.0"
+  },
+  "build": {
+    "appId": "com.soundfree.web",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ]
+  }
+}
