@@ -8,7 +8,10 @@ export const useDownloadStore = defineStore("download", () => {
   const downloads = ref([]);
   const downloadPath = ref(null);
 
-  // URL de l'API backend (à configurer selon votre environnement)
+  // Détection de l'environnement
+  const isElectron = window.electronAPI?.isElectron || false;
+
+  // URL de l'API backend (pour le mode web seulement)
   const API_URL = "http://localhost:3000";
 
   const DOWNLOAD_STATUS = {
@@ -20,10 +23,47 @@ export const useDownloadStore = defineStore("download", () => {
 
   const hasActiveDownloads = computed(() => downloads.value.length > 0);
 
-  const startDownload = async (download) => {
+  // Version Electron : téléchargement direct
+  const startDownloadElectron = async (download) => {
+    try {
+      if (!downloadPath.value) {
+        const selectedPath = await window.electronAPI.selectDownloadFolder();
+        if (!selectedPath) {
+          throw new Error("Aucun dossier de téléchargement sélectionné");
+        }
+        downloadPath.value = selectedPath;
+      }
+
+      // Récupérer les informations
+      download.status = DOWNLOAD_STATUS.DOWNLOADING;
+      const trackInfo = await window.electronAPI.getTrackInfo(download.url);
+      download.title = trackInfo.title;
+
+      // Télécharger
+      const result = await window.electronAPI.downloadTrack(
+        download.url,
+        downloadPath.value
+      );
+
+      if (result.success) {
+        download.status = DOWNLOAD_STATUS.COMPLETED;
+        download.progress = 100;
+        download.filePath = result.path;
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      download.status = DOWNLOAD_STATUS.ERROR;
+      download.error = error.message;
+      throw error;
+    }
+  };
+
+  // Version Web : appels API (conservée pour compatibilité)
+  const startDownloadWeb = async (download) => {
     try {
       // Récupérer d'abord les informations de la piste
-      const infoResponse = await fetch(`${API_URL}/api/info`, {
+      const infoResponse = await fetch(`${API_URL}/api/track/info`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -47,7 +87,7 @@ export const useDownloadStore = defineStore("download", () => {
       download.status = DOWNLOAD_STATUS.DOWNLOADING;
       download.progress = 0;
 
-      const response = await fetch(`${API_URL}/api/download`, {
+      const response = await fetch(`${API_URL}/api/track/download`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -88,9 +128,17 @@ export const useDownloadStore = defineStore("download", () => {
       download.progress = 100;
     } catch (error) {
       download.status = DOWNLOAD_STATUS.ERROR;
-      download.error = error.message; // Stockons le message d'erreur
+      download.error = error.message;
       console.error("Erreur détaillée:", error);
       throw error;
+    }
+  };
+
+  const startDownload = async (download) => {
+    if (isElectron) {
+      return await startDownloadElectron(download);
+    } else {
+      return await startDownloadWeb(download);
     }
   };
 
@@ -120,6 +168,17 @@ export const useDownloadStore = defineStore("download", () => {
     isProcessing.value = false;
     urls.value = "";
     showUrlInput.value = false;
+  };
+
+  const selectDownloadFolder = async () => {
+    if (isElectron) {
+      const selectedPath = await window.electronAPI.selectDownloadFolder();
+      if (selectedPath) {
+        downloadPath.value = selectedPath;
+      }
+      return selectedPath;
+    }
+    return null;
   };
 
   const showImportDialog = () => {
@@ -152,12 +211,15 @@ export const useDownloadStore = defineStore("download", () => {
     urls,
     isProcessing,
     downloads,
+    downloadPath,
     hasActiveDownloads,
+    isElectron,
     showImportDialog,
     processUrls,
     cancelProcess,
     removeDownload,
     clearCompleted,
+    selectDownloadFolder,
     DOWNLOAD_STATUS,
     setDownloadPath,
   };
